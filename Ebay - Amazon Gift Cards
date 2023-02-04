@@ -1,0 +1,260 @@
+from bs4 import BeautifulSoup
+import requests
+import re
+import time
+import pandas as pd
+import numpy as np
+import json
+import os
+from urllib.request import Request, urlopen
+from tqdm import tqdm
+
+
+# ### Part a
+
+
+#defining the url of the first page
+url = "https://www.ebay.com/sch/i.html?_from=R40&_nkw=amazon+gift+card&_sacat=0&rt=nc&LH_Sold=1&LH_Complete=1"
+
+#defining a new variable called page, user agent is basically telling that we are basically Mozilla. 
+user_agent = {'User-agent': 'Mozilla/5.0'}
+page = requests.get(url, headers=user_agent)
+
+#creating a bs4 object "class" and reading the HTML contents stored in "page" which was requested above
+soup = BeautifulSoup(page.text, 'lxml')
+
+
+
+#creating a file "ebay_amazon gift cards_webpages" for storing all the pages of seacrh results that we download. But before that we are checking if the we already have one file with the same name. If so they code piece will not run
+try:
+    if not os.path.exists("ebay_amazon gift cards_webpage1"):
+        os.makedirs("ebay_amazon gift cards_webpage1")
+except:
+    pass
+
+
+#downloading the first pages of seacrh results 
+
+response_page1 = requests.get(url, headers = user_agent)
+soup_page1 = BeautifulSoup(response_page1.content, 'html.parser')
+with open('ebay_amazon gift cards_webpage1/amazon_gift_card_01.htm', 'w', encoding='utf-8') as file:
+    file.write(str(soup_page1))
+time.sleep(10)
+
+
+# ### Part b
+
+
+#creating a list to contain all the url's for the 10 pages
+
+list1 = []
+
+#appending the product url's into list1
+for i in range(1,11):
+    list1.append(url + '&_pgn={}'.format(str(i))) 
+
+
+#creating a file "ebay_amazon gift cards_webpages" for storing all the pages of seacrh results that we download
+
+try:
+    if not os.path.exists("ebay_amazon gift cards_webpages"):
+        os.makedirs("ebay_amazon gift cards_webpages")
+except:
+    pass
+
+
+#downloading the first 10 pages of seacrh results
+
+j = 1
+for i in tqdm(list1):
+    response_pages1 = requests.get(i, headers = user_agent)
+    soup_pages1 = BeautifulSoup(response_pages1.content, 'html.parser')
+    with open('ebay_amazon gift cards_webpages/amazon_gift_card_{}.htm'.format(str(j)), 'w', encoding='utf-8') as file:
+        file.write(str(soup_pages1))
+    j = j + 1
+    time.sleep(10)
+
+
+# ### Part c
+
+
+#defining a list which stores all the content present across the 10 downloaded html files
+
+webpage_content = []
+
+#in this piece of code we are accessing the downloaded pages which are stored in the file "bntop40_webpages"
+
+for i in range(1 , len(list1)+1):
+    with open('ebay_amazon gift cards_webpages/amazon_gift_card_{}.htm'.format(str(i)), encoding='utf-8') as link_to_page:
+        soup_open = BeautifulSoup(link_to_page, 'html.parser')
+        webpage_content.append(soup_open)
+
+
+# ### Part d
+
+
+#defining a list basically to store the scrapped content from all the pages of seacrh results
+
+title_info = []
+price_info = []
+shipping_info = []
+
+count = 1
+for webpage in webpage_content:
+    
+    
+    #identifying all the amazon gift cards in the webpage and storing them in a list
+    product_list = webpage.find_all('div' , {'class' : 's-item__wrapper clearfix'})
+    
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+    print(f"Page {count}")
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+    
+    count = count+1
+    #accessing each product in the product list obtained from above
+    for product in product_list:  
+        
+        
+        #printing the title of the product 
+        if product.find('div' , attrs = {'class' : 's-item__title'}).find('span').text == "Shop on eBay":
+            pass
+        else:
+            sentence = product.find('div' , attrs = {'class' : 's-item__title'}).find('span').text
+            title = re.sub(r"^New Listing", "", sentence)
+            print(title)
+            title_info.append(title)
+            
+        
+        #printing the price of the product
+        if product.find('div' , attrs = {'class' : 's-item__title'}).find('span').text == "Shop on eBay":
+            pass
+        else:
+            price = product.find('span' , attrs = {'class' : 's-item__price'}).text
+            print(price)
+            price_info.append(price)
+    
+ 
+        #printing the shipping cost and if it doesn't have any information regarding shipping then printing $0
+        if product.find('div' , attrs = {'class' : 's-item__title'}).find('span').text == "Shop on eBay":
+            pass
+        else:
+            try:
+                shipping = product.find('span' , attrs = {'class' : 's-item__shipping s-item__logisticsCost'}).text
+                print(shipping)
+                shipping_info.append(shipping)
+            except:
+                #if there is no shipping cost mentioned then I am printing "$0.00" for thoes cases
+                print("No shipping cost mentioned")
+                shipping_info.append("Free shipping")
+        
+        print("----------------------------------------------------------------")
+
+
+#converting the above 3 lists into a data frame by the name "df"
+
+df = pd.DataFrame({'Title':title_info, 'Price' : price_info, 'shipping' : shipping_info})
+
+
+# ### Part e
+
+
+#using regex to extract the face value from the title of the product
+
+#defining an empty string to store the values post operation
+face_value = []
+
+for i in title_info:
+    x = re.search("(.*?)([0-9]{1,4})(.*)",i)
+    if x:
+        face_value.append(re.sub("(.*?)([0-9]{1,4})(.*)",r"\2",i))
+    else:
+        face_value.append("NA")
+
+
+#using regex to extract the price from the product
+
+#defining an empty string to store the values post operation
+price_value = []
+
+for i in price_info:
+    if i.count("$") > 1:
+        price_value.append("No price value")
+    else:
+        price_value.append(float(re.sub("(\$)([0-9]+)(.)([0-9]+)",r"\2\3\4",i)))
+
+
+
+#using regex to extract the shipping cost 
+
+#defining an empty string to store the values post operation
+shipping_value = []
+
+for i in shipping_info:
+    if i == "Free shipping":
+        shipping_value.append("0.00")
+    else:
+        shipping_value.append(float(re.sub('(.*)([0-9]+)(.)([0-9]+)(.*)' , r"\2\3\4" ,i)))
+
+
+#converting the above 3 lists into a data frame
+
+df_value = pd.DataFrame({'Face Value':face_value, 'Price Value' : price_value, 'Shipping Value' : shipping_value})
+df_value['Gift Card Number'] = [i for i, _ in enumerate(df_value.index)]
+
+
+#dropping the rows which has the following strings displayed in their rows
+
+string_to_drop_1 = 'NA'
+string_to_drop_2 = 'No price value'
+
+df_value_it1 = df_value[~df_value['Face Value'].str.contains(string_to_drop_1, na=False)]
+df_value_final = df_value_it1[~df_value_it1['Price Value'].str.contains(string_to_drop_2, na=False)]
+
+
+#converting the data types of columns to float
+
+df_value_final['Face Value'] = df_value_final['Face Value'].astype(float)
+df_value_final['Price Value'] = df_value_final['Price Value'].astype(float)
+df_value_final['Shipping Value'] = df_value_final['Shipping Value'].astype(float)
+
+
+#appending a new column to the above data frame which displays "yes" and "no" when below conditions are met
+
+df_value_final.loc[df_value_final['Face Value'] < df_value_final['Price Value'] + df_value_final['Shipping Value'], '>face'] = '1'
+df_value_final.loc[df_value_final['Face Value'] >= df_value_final['Price Value'] + df_value_final['Shipping Value'], '>face'] = '0'
+
+
+
+#displaying a data frame consisting of gift cards row numbers whoes face value is less than their selling price (shipping and price)
+
+df_index = pd.DataFrame(df_value_final[df_value_final['>face'] == '1']['Gift Card Number'])
+
+
+#displaying details of the gift cards that were sold above the face value
+
+count = 1
+print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+print("Gift Cards that are sold above the Face Value")
+print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+for value in df_index['Gift Card Number']:
+    print(f"Gift Card {count}")
+    print(df.iloc[value])
+    print("----------------------------------------------------------------")
+    count = count+1
+print("\n")
+
+
+# ### Part f
+
+#finding the fraction of gift cards that are sold above the face value among all the listed gift cards in our case
+
+total_number_of_gift_cards = len(df)
+total_number_of_overpriced_gift_cards = len(df_index)
+fraction = ((total_number_of_overpriced_gift_cards / total_number_of_gift_cards)*100)
+print("The fraction of gift cards that were sold above the face value are {}".format(fraction),"%")
+print("\n")
+
+print("So I can think of three reasons:")
+print("  1. It could be because people are purchasing the gift cards for gifting purposes and hecen they don't mind the additional cost (which is shipping cost)")
+print("  2. It could be because some of the products available on amazon might be offering you additional discount on total purchase value and hence people don't mind paying a bit more dollars over the face value.")
+print("  3. For illegal purposes, money laundering ")
