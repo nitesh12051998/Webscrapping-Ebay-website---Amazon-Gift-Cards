@@ -1,0 +1,158 @@
+from bs4 import BeautifulSoup
+import requests
+import re
+import time
+import pandas as pd
+import numpy as np
+import json
+import os
+from urllib.request import Request, urlopen
+from tqdm import tqdm
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.webdriver import WebDriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import pymongo
+from fastapi import FastAPI
+from datetime import datetime
+from pymongo import MongoClient
+import random
+from webdriver_manager.chrome import ChromeDriverManager
+
+
+# # Selenium: The Bored Ape Yacht Club
+
+# ### Part 1
+def q1():
+    # In[2]:
+
+    print("Function 1 start")
+    url = 'https://opensea.io/collection/boredapeyachtclub?search[sortAscending]=false&search[stringTraits][0][name]=Fur&search[stringTraits][0][values][0]=Solid%20Gold'
+
+
+# ### Part 2
+
+def q2():
+    
+    # In[3]:
+
+    print("Function 2 start")
+    #to automate the web browser
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+    driver.implicitly_wait(10)
+    driver.set_script_timeout(120)
+    driver.set_page_load_timeout(10)
+
+    #opening the url abd waiting for the page to load
+    url = 'https://opensea.io/collection/boredapeyachtclub?search[sortAscending]=false&search[stringTraits][0][name]=Fur&search[stringTraits][0][values][0]=Solid%20Gold'
+    driver.get(url)
+    time.sleep(5)
+
+    #creating a folder "bored_ape_solid_gold_fur_folder" to store all the top 8 bored app pages 
+    try:
+        if not os.path.exists("bored_ape_solid_gold_fur_folder"):
+            os.makedirs("bored_ape_solid_gold_fur_folder")
+    except:
+        pass
+
+
+    # defining the base xpath
+    base_xpath = '//*[@id="main"]/div/div/div/div[5]/div/div[7]/div[3]/div[2]/div/div['
+
+    #defining the base xpath to extract the name
+    name_base_xpath = '//*[@id="main"]/div/div/div/div[5]/div/div[7]/div[3]/div[2]/div/div['
+
+    #defining an empty list
+    name_list = []
+
+    #number of top most expensive bored apes to download
+    n = 8
+
+    for i in range(1 , n+1):
+
+        #getting the xpath
+        xpath = base_xpath + str(i) + ']/article/a'
+
+        #fetching the name of the ape
+        name_xpath = name_base_xpath + str(i) + ']/article/a/div[3]/div[1]/div/div/span'
+        name = driver.find_element(By.XPATH, name_xpath)
+        j = name.text
+        name_list.append(j)
+        time.sleep(7)
+
+        #clicking on the first ape
+        deal_of_the_day = driver.find_element(By.XPATH, xpath)
+        driver.execute_script("arguments[0].scrollIntoView();", deal_of_the_day)
+        deal_of_the_day.click()
+        time.sleep(7)
+
+
+
+        #fetching the html code of the page that is currently open
+        html_dotd = driver.page_source
+        time.sleep(7)
+
+
+        #downloading the htm file of the above
+        with open(f'bored_ape_solid_gold_fur_folder/bayc_{j}.html', 'w', encoding='utf-8') as file:
+            file.write(str(html_dotd))
+            time.sleep(7)
+
+        #going back to main page to download the next bored ape
+        driver.back()
+        time.sleep(7)
+
+    return(name_list)
+    time.sleep(5)
+    driver.close()
+
+
+# # Mongo DB
+
+# ### Part 3
+
+def q3(name_list):
+
+    # In[4]:
+
+    print("Function 3 start")
+    
+    # Connect to MongoDB database
+    client = pymongo.MongoClient("mongodb://localhost:27017/")
+
+    # define database
+    db = client["ddr_individual_project2"]
+
+    # Drop the "bayc" collection if it exists
+    if "bayc" in db.list_collection_names():
+        db["bayc"].drop()
+
+    # make bayc collection
+    collection = db["bayc"]
+
+    name_list = name_list
+    
+    # Go through all the htm files
+    for i in name_list:
+        with open('bored_ape_solid_gold_fur_folder/bayc_{}.html'.format(str(i)), 'r', encoding='utf-8') as link_to_page:
+            soup = BeautifulSoup(link_to_page, 'html.parser')
+
+            # Get the ape's name and attributes
+            name = soup.find("section", {"class": "item--header"}).find("div",{"class":"sc-29427738-0 sc-630fc9ab-0 dJYDEb jSPhMX"}).find("h1", {"class" : "sc-29427738-0 hKCSVX item--title"}).text
+
+            #defining a dictionary
+            elements = {'Ape Name' : name}
+
+            #finding all the attributes for the ongoing page
+            attributes = soup.find_all("div", {"class": "item--property"})
+
+            #writing a loop to traverse each listed attribute
+            for a in attributes:
+                elements[ a.find("div", {"class": "Property--type"}).text] = a.find("div", {"class": "Property--value"}).text
+
+            #inserting the dictionary  into the collection
+            collection.insert_one(elements) 
