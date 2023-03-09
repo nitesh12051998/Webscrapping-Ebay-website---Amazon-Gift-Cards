@@ -156,3 +156,24 @@ def q3(name_list):
 
             #inserting the dictionary  into the collection
             collection.insert_one(elements) 
+            
+# Defining main function
+def main():
+    q1()
+    name_list = q2()
+    q3(name_list)
+    q4()
+    q5()
+    q6()
+    rank_list = q7()
+    q8(rank_list)
+    q9(rank_list)
+    
+  
+  
+# Using the special variable 
+# __name__
+if __name__=="__main__":
+    main()
+            
+            
